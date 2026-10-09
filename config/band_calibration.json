@@ -1,0 +1,35 @@
+{
+  "_about": "Band widening factors k per band level: band = median +/- k * raw half-band (p90-p50 above, p50-p10 below). Fitted by benchmarks/fit_band_calibration.py on benchmarks/results/accuracy_20261007_2221_q6_1h_h240_p32_vol.csv, benchmarks/results/accuracy_20261003_1851_C_topp10_hist240.csv.",
+  "groups": {
+    "other": {
+      "n_forecasts": 40,
+      "k": {
+        "40": 1.665,
+        "50": 1.966,
+        "60": 2.587,
+        "70": 4.405,
+        "80": 5.032
+      },
+      "held_out_coverage_when_fitted_on_earlier_half": {},
+      "raw_80pct_band_coverage": 0.2
+    },
+    "us_equity_extended": {
+      "n_forecasts": 600,
+      "k": {
+        "40": 0.966,
+        "50": 1.294,
+        "60": 1.67,
+        "70": 2.201,
+        "80": 2.92
+      },
+      "held_out_coverage_when_fitted_on_earlier_half": {
+        "40": 0.471,
+        "50": 0.621,
+        "60": 0.675,
+        "70": 0.739,
+        "80": 0.846
+      },
+      "raw_80pct_band_coverage": 0.41
+    }
+  }
+}

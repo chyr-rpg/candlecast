@@ -1,0 +1,9 @@
+# Copy to config/watchlist.csv and edit. Without that file (or with no tickers in it) the
+# default list in config/settings.toml is used.
+# exchange is optional: blank or NASDAQ/NYSE/AMEX => Alpaca US stock. Crypto, FX and
+# commodities must have a row in config/symbol_map.csv (e.g. BTCUSD, ETHUSD, XAUUSD, EURUSD, WTI).
+ticker,exchange
+AAPL,NASDAQ
+MSFT,NASDAQ
+BTCUSD,
+XAUUSD,

@@ -1,0 +1,62 @@
+# Price_Forecast settings. Paths are relative to the project root unless absolute.
+
+[universe]
+# The owner's own list (column "ticker"; optional "exchange"). Missing or empty => default_tickers.
+watchlist_csv = "config/watchlist.csv"
+# Magnificent Seven + DIA, QQQ, SPY + gold + bitcoin.
+default_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA",
+                   "DIA", "QQQ", "SPY", "XAUUSD", "BTCUSD"]
+
+[model]
+# "small" or "base". Kronos-mini is deliberately not offered.
+name = "base"
+tokenizer_repo = "NeoQuasar/Kronos-Tokenizer-base"
+max_context = 512          # history fed = max_context - horizon, so the KV cache stays exact
+# 100 paths: p10/p90 sampling error ~5-13% of the band width (30 paths: 8-22%). Measured 2026-10-03.
+sample_paths = 100
+# Fastest on the i7-1355U (2P+8E cores): 8 threads 9.9s vs default 10 threads 11.8s (30 paths x 32 steps).
+torch_threads = 8
+temperature = 1.0
+# Accuracy check 2026-10-03 (240 past forecasts): top_p 0.9 vs 1.0 made no difference; history 240 bars
+# beat 480 clearly (error vs no-change 1.44 vs 2.16, 80%-band coverage 38% vs 19%). Still worse than
+# the no-change / random-walk baselines - forecasts are NOT validated. See benchmarks/results/.
+top_p = 1.0
+history_bars = 240         # 0 = as many as the KV cache allows (max_context - horizon)
+
+[model.repos]
+small = "NeoQuasar/Kronos-small"
+base = "NeoQuasar/Kronos-base"
+
+[horizon]
+# Number of future 1h bars per instrument class (~2 sessions each).
+us_equity_extended = 32   # 04:00-20:00 ET, 16 bars/day
+crypto = 48               # 24/7
+fx = 48                   # 24/5
+commodity = 46            # ~23h/day futures-style session
+
+[data]
+symbol_map_csv = "config/symbol_map.csv"   # overrides; NASDAQ/NYSE/AMEX tickers map to Alpaca automatically
+history_days = 730          # first download depth (yfinance 1h is capped at ~730 days)
+overlap_hours = 48          # incremental updates re-fetch this much and compare with the cache
+revision_rtol = 0.005       # overlap close mismatch beyond this => full re-download (e.g. a split)
+min_bars = 512              # Kronos context length; fewer => status "short"
+stale_days = 4              # last bar older than this => status "stale" (covers weekends)
+
+[output]
+keep_paths_days = 30        # per-path files and charts older than this are pruned; summaries kept forever
+chart_history_bars = 80     # history shown left of the forecast (~5 US trading days of extended hours)
+# Band drawn on charts: a CALIBRATED band at this level (40-80, see config/band_calibration.json;
+# Kronos's raw 80% band caught only ~40% of outcomes). 0 = draw Kronos's raw 50%/80% bands.
+chart_band_level = 80
+
+[test_forecast]
+# Each run also forecasts the LAST horizon's worth of bars that already happened (same length as the
+# live forecast: 32 bars for US equities = the last 2 sessions), using only bars before them, and
+# draws it against the actual closes. Out-of-sample, same model/settings/seed rule; doubles run time.
+enabled = true
+
+[paths]
+bars_dir = "data/bars/1h"
+forecasts_dir = "outputs/forecasts"
+index_db = "outputs/forecast_index.db"
+run_log_dir = "outputs/run_log"

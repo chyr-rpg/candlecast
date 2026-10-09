@@ -1,0 +1,31 @@
+Kronos base, 50 paths, T=1.0, top_p=1.0, bars=4h, pred_len=8, history=240, 40 origins/instrument, aligned dates, 400 forecasts, 1771s
+
+                        n  MAE kronos %  MAE no-change %  MAE ratio  direction hit  Brier (coin=0.25)  cover end (80%)  cover high (80%)  cover low (80%)  CRPS ratio vs RW
+us_equity_extended  400.0         2.286            2.088      1.095          0.485              0.309            0.588              0.63            0.562             1.148
+ALL                 400.0         2.286            2.088      1.095          0.485              0.309            0.588              0.63            0.562             1.148
+
+Per ticker:
+           n  MAE kronos %  MAE no-change %  MAE ratio  direction hit  Brier (coin=0.25)  cover end (80%)  cover high (80%)  cover low (80%)  CRPS ratio vs RW
+ticker                                                                                                                                                        
+AAPL    40.0         2.314            1.703      1.359          0.475              0.351            0.550             0.600            0.400             1.375
+AMZN    40.0         2.379            2.165      1.099          0.400              0.307            0.650             0.600            0.575             1.133
+DIA     40.0         1.046            0.846      1.236          0.400              0.337            0.525             0.575            0.550             1.274
+GOOGL   40.0         2.802            2.824      0.992          0.550              0.259            0.600             0.600            0.475             1.043
+META    40.0         3.323            2.923      1.137          0.475              0.285            0.575             0.650            0.550             1.141
+MSFT    40.0         2.403            2.135      1.125          0.450              0.288            0.775             0.575            0.575             1.139
+NVDA    40.0         2.714            2.889      0.939          0.500              0.313            0.525             0.625            0.750             1.020
+QQQ     40.0         1.617            1.522      1.063          0.600              0.311            0.525             0.700            0.625             1.193
+SPY     40.0         1.217            0.996      1.222          0.450              0.356            0.500             0.700            0.575             1.351
+TSLA    40.0         3.046            2.880      1.058          0.550              0.284            0.650             0.675            0.550             1.130
+
+Ranking across instruments on each date (RankIC; 0 = no skill, >0 = ranks returns correctly):
+  exp_ret_mean  mean RankIC +0.022  (t = +0.42, 40 dates, positive on 45%)
+  exp_ret_p50   mean RankIC +0.046  (t = +0.89, 40 dates, positive on 45%)
+
+Realized volatility over the forecast window (lower MAE/QLIKE = better; timing > 0 = good):
+  method              MAE %   QLIKE  timing
+  rv_kronos_mean      0.976   0.421  +0.177
+  rv_kronos_median    0.888   0.427  +0.182
+  rv_hist             0.901   0.392  +0.005
+  rv_ewma             0.860   0.414  +0.269
+  rv_garch            0.852   0.361  +0.181

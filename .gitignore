@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+build/
+dist/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+
+# Regenerable data and run outputs
+data/
+outputs/
+.pipfreeze.txt
+benchmarks/results/*.log
+
+# Build / tooling output
+build_log.txt
+iscc_log.txt
+*.spec.bak

@@ -1,0 +1,13 @@
+ticker,source,source_symbol,asset_class,note
+BTCUSD,alpaca_crypto,BTC/USD,crypto,
+ETHUSD,alpaca_crypto,ETH/USD,crypto,
+XAUUSD,yfinance,GC=F,commodity,COMEX gold front-month future (no spot XAUUSD on yfinance); roll jumps possible
+XAGUSD,yfinance,SI=F,commodity,COMEX silver front-month future (no spot XAGUSD on yfinance); roll jumps possible
+WTI,yfinance,CL=F,commodity,NYMEX WTI front-month future; roll jumps possible
+BRENT,yfinance,BZ=F,commodity,ICE Brent front-month future; roll jumps possible
+USDJPY,yfinance,USDJPY=X,fx,yfinance FX volume is always 0
+EURUSD,yfinance,EURUSD=X,fx,yfinance FX volume is always 0
+GBPUSD,yfinance,GBPUSD=X,fx,yfinance FX volume is always 0
+USDCHF,yfinance,USDCHF=X,fx,yfinance FX volume is always 0
+AUDUSD,yfinance,AUDUSD=X,fx,yfinance FX volume is always 0
+USDCAD,yfinance,USDCAD=X,fx,yfinance FX volume is always 0
