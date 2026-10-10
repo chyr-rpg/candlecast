@@ -813,7 +813,11 @@ class CandleCastApp(ctk.CTk):
         self.chart_title.configure(text=f"{res.ticker}  ·  {row['pred_len']} x {timeframes.LABELS[row['timeframe']]} bars")
         self._fill_cards(res, level)
         img = Image.open(path)
-        w, h = max(self.chart_box.winfo_width() - 8, 300), max(self.chart_box.winfo_height() - 8, 200)
+        # winfo_* are physical pixels, but CTkImage sizes are multiplied by the Windows display scaling
+        # (e.g. 125%), so convert - otherwise the chart overflows its frame and the date axis is cut off
+        dpi = self.chart._get_widget_scaling() or 1.0
+        w = max(self.chart_box.winfo_width() - 8, 300) / dpi
+        h = max(self.chart_box.winfo_height() - 8, 200) / dpi
         scale = min(w / img.width, h / img.height, 1.0)
         size = (max(1, int(img.width * scale)), max(1, int(img.height * scale)))
         self._chart_image = ctk.CTkImage(light_image=img, dark_image=img, size=size)
