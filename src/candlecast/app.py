@@ -400,9 +400,9 @@ class AboutDialog(ctk.CTkToplevel):
         logo = ctk.CTkImage(Image.open(ASSETS / "logo.png"), size=(72, 72))
         ctk.CTkLabel(self, image=logo, text="").pack(pady=(22, 4))
         ctk.CTkLabel(self, text=f"CandleCast {__version__}", font=ctk.CTkFont(size=20, weight="bold")).pack()
-        text = ("Probabilistic price forecasts on your desktop, powered by the open-source Kronos foundation "
-                "model (MIT licence). Every chart also shows a test forecast made N bars ago, so you can see how "
-                "the model did on prices that already happened.\n\n"
+        text = ("A research desktop app for exploring probabilistic market forecasts with the open-source "
+                "Kronos foundation model (MIT licence). Every chart also shows a historical test window - a "
+                "forecast made N bars ago - so you can compare it with what prices actually did.\n\n"
                 "Shared for learning and information only - not a trading signal or investment advice. To push "
                 "the forecasts further, try training or fine-tuning Kronos on your own data (the Kronos "
                 "repository includes fine-tuning scripts).\n\nFree and open source under the MIT licence.")

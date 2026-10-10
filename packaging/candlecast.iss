@@ -1,7 +1,7 @@
 ; Inno Setup script for the CandleCast Windows installer. Build with packaging\build.ps1.
 #define AppName "CandleCast"
 #ifndef AppVersion
-  #define AppVersion "0.2.0"
+  #define AppVersion "0.2.1"
 #endif
 #define AppExe "CandleCast.exe"
 
