@@ -85,3 +85,30 @@ def test_ensure_console_streams_replaces_missing_streams(monkeypatch):
     monkeypatch.setattr(sys, "stderr", None)
     kronos_loader.ensure_console_streams()
     sys.stderr.write("progress bar output goes nowhere\n")      # would raise AttributeError before
+
+
+def test_partial_model_cache_is_not_used(tmp_path, monkeypatch):
+    """A crashed download can leave a cache snapshot with only README.md; it must be re-downloaded."""
+    import huggingface_hub
+
+    from candlecast import kronos_loader
+    partial = tmp_path / "hf_snapshot"
+    partial.mkdir()
+    (partial / "README.md").write_text("x", encoding="utf-8")
+    calls = []
+
+    def fake_snapshot(repo, local_files_only=False, local_dir=None, tqdm_class=None):
+        calls.append(local_files_only)
+        if local_files_only:
+            return str(partial)
+        (tmp_path / "out").mkdir(exist_ok=True)
+        from pathlib import Path
+        Path(local_dir, "config.json").write_text("{}", encoding="utf-8")
+        Path(local_dir, "model.safetensors").write_bytes(b"0")
+        return local_dir
+
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", fake_snapshot)
+    monkeypatch.setattr(kronos_loader, "MODELS_DIR", tmp_path / "models")
+    path = kronos_loader.local_model_dir("Owner/Model")
+    assert calls == [True, False] and path.endswith("Owner--Model")
+    assert kronos_loader.local_model_dir("Owner/Model") == path and calls == [True, False]   # marker reused

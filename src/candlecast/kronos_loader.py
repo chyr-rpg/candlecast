@@ -80,6 +80,15 @@ MODELS_DIR = DATA_DIR / "models"
 _COMPLETE = ".download-complete"
 
 
+def _is_complete(folder) -> bool:
+    """A usable model folder has its config and weights (a cancelled or crashed download may leave only
+    some files behind)."""
+    from pathlib import Path  # noqa: PLC0415
+
+    folder = Path(folder)
+    return (folder / "config.json").is_file() and any(folder.glob("*.safetensors"))
+
+
 def local_model_dir(repo: str) -> str:
     """Folder with the repo's files, loaded without any network check once present.
 
@@ -90,15 +99,20 @@ def local_model_dir(repo: str) -> str:
 
     ensure_console_streams()
     target = MODELS_DIR / repo.replace("/", "--")
-    if (target / _COMPLETE).exists():
+    if (target / _COMPLETE).exists() and _is_complete(target):
         return str(target)
     try:
-        return snapshot_download(repo, local_files_only=True)
+        cached = snapshot_download(repo, local_files_only=True)
+        if _is_complete(cached):
+            return cached
     except Exception:  # not in the standard cache: download into our own folder
         pass
     log.info("Downloading %s from Hugging Face (one time) ...", repo)
     target.mkdir(parents=True, exist_ok=True)
     snapshot_download(repo, local_dir=str(target), tqdm_class=_progress_class(repo.split("/")[-1]))
+    if not _is_complete(target):
+        raise RuntimeError(f"Download of {repo} is incomplete (no config.json / weights) - check the "
+                           "internet connection and try again.")
     (target / _COMPLETE).write_text(repo, encoding="utf-8")
     log.info("Downloaded %s to %s", repo, target)
     return str(target)
