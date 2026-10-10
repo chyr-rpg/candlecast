@@ -156,7 +156,7 @@ class ForecastRunner:
 
                 self.log(f"Loading the Kronos-{self.settings.model.name} model (downloaded once the first time, then loaded from disk) ...")
                 configure_torch_threads(self.settings.model.torch_threads)
-                self._predictor = predictor_for(self.settings.model)
+                self._predictor = predictor_for(self.settings.model, offline=getattr(self.settings, "offline", False))
         return self._predictor
 
     SLOW_AFTER_S = 120   # a normal ticker takes 10-90 s

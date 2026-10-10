@@ -34,6 +34,7 @@ def _data_dir() -> Path:
 DATA_DIR = _data_dir()
 PROJECT_ROOT = DATA_DIR          # kept for older call sites: the writable root
 ALLOWED_MODELS = ("small", "base")
+CUSTOM_MODEL = "custom"         # desktop app: any Kronos checkpoint (Hugging Face id or local folder)
 CONFIG_FILES = ("settings.toml", "symbol_map.csv", "band_calibration.json", "watchlist.example.csv")
 
 
@@ -88,6 +89,7 @@ class Settings:
     model_repos: dict[str, str] = field(default_factory=dict)
     test_forecast: bool = True  # also forecast the last horizon that already happened (chart + test_forecasts)
     chart_band_level: int = 80  # calibrated band drawn on charts (config/band_calibration.json); 0 = raw bands
+    offline: bool = False       # True: never download prices or models; use only what is on this PC
 
 
 def _resolve(root: Path, value: str) -> Path:

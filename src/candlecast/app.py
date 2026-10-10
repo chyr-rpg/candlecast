@@ -33,7 +33,7 @@ from candlecast.panel import (
     resolve_tickers,
     save_as_jpg,
 )
-from candlecast.settings import ALLOWED_MODELS, DATA_DIR, load_prefs, load_secret, load_settings, save_prefs, save_secrets
+from candlecast.settings import ALLOWED_MODELS, CUSTOM_MODEL, DATA_DIR, load_prefs, load_secret, load_settings, save_prefs, save_secrets
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 ACCENT = ("#2a78d6", "#3987e5")
@@ -43,7 +43,23 @@ CARD = ("#ffffff", "#2e2e2d")
 TIMEFRAME_LABELS = ("1H", "4H", "1D", "1W")
 KRONOS_URL = "https://github.com/shiyu-coder/Kronos"
 MODEL_CHOICES = {"Kronos-base (default, larger and slower)": "base",
-                 "Kronos-small (about 3x faster, smaller download)": "small"}
+                 "Kronos-small (about 3x faster, smaller download)": "small",
+                 "Custom Kronos checkpoint (e.g. Kronos-large, if you have a copy)": CUSTOM_MODEL}
+
+
+def with_model(settings, name: str, repo: str | None = None):
+    """``settings`` with another model: "base"/"small", or CUSTOM_MODEL with a Hugging Face id or folder."""
+    from dataclasses import replace  # noqa: PLC0415
+
+    if name == CUSTOM_MODEL:
+        if not (repo or "").strip():
+            raise ValueError("Enter a Hugging Face model id (owner/name) or a folder for the custom model.")
+        repo = repo.strip()
+    elif name in ALLOWED_MODELS:
+        repo = settings.model_repos[name]
+    else:
+        raise ValueError(f"unknown model {name!r}")
+    return replace(settings, model=replace(settings.model, name=name, repo=repo))
 ALPACA_URL = "https://alpaca.markets/"
 
 
@@ -119,7 +135,7 @@ class SettingsDialog(ctk.CTkToplevel):
         super().__init__(app)
         self.app = app
         self.title("CandleCast settings")
-        self.geometry("560x560")
+        self.geometry("560x680")
         self.resizable(False, False)
         self.transient(app)
         self.after(150, self.grab_set)
@@ -146,8 +162,16 @@ class SettingsDialog(ctk.CTkToplevel):
         self.model = ctk.CTkOptionMenu(self, values=list(MODEL_CHOICES), width=510)
         self.model.set(current or next(iter(MODEL_CHOICES)))
         self.model.pack(**pad)
-        ctk.CTkLabel(self, text=("Each model downloads once (base ~410 MB). Kronos-large is not publicly released "
-                                 "by its authors, so it cannot be offered."), wraplength=510, justify="left",
+        self.custom_repo = ctk.CTkEntry(self, width=510,
+                                        placeholder_text="Custom model: Hugging Face id (owner/name) or a folder path")
+        self.custom_repo.pack(**pad)
+        saved = load_prefs(app.settings.root).get("custom_repo") or ""
+        if saved:
+            self.custom_repo.insert(0, saved)
+        ctk.CTkLabel(self, text=("Each model downloads once (base ~410 MB). Kronos-large is not publicly "
+                                 "released by its authors (they list it as not open-source), so it cannot be "
+                                 "downloaded - but if you obtain or train a Kronos checkpoint, choose Custom and "
+                                 "enter its folder or Hugging Face id."), wraplength=510, justify="left",
                      text_color=MUTED).pack(anchor="w", **pad)
         self.status = ctk.CTkLabel(self, text="", text_color=MUTED, wraplength=510, justify="left")
         self.status.pack(anchor="w", padx=22, pady=(10, 0))
@@ -181,10 +205,187 @@ class SettingsDialog(ctk.CTkToplevel):
     def save(self):
         self._apply()
         path = save_secrets({"ALPACA_API_KEY_ID": self.key.get(), "ALPACA_API_SECRET_KEY": self.secret.get()})
-        self.app.set_model(MODEL_CHOICES[self.model.get()])
+        try:
+            self.app.set_model(MODEL_CHOICES[self.model.get()], repo=self.custom_repo.get())
+        except ValueError as exc:
+            self.status.configure(text=str(exc), text_color=BAD)
+            return
         self.status.configure(text=f"Saved to {path}", text_color=GOOD)
         self.app.refresh_key_banner()
         self.after(700, self.destroy)
+
+
+class EmailDialog(ctk.CTkToplevel):
+    """Daily forecast e-mail: your mailbox, what to forecast, when. Sends through your own mailbox (SMTP)."""
+
+    def __init__(self, app: "CandleCastApp"):
+        from candlecast import emailer  # noqa: PLC0415
+
+        super().__init__(app)
+        self.app, self.em = app, emailer
+        self._help_url = None
+        self.title("Daily forecast e-mail")
+        self.geometry("600x560")
+        self.resizable(False, False)
+        self.transient(app)
+        self.after(150, self.grab_set)
+        _apply_icon(self)
+        cfg = emailer.load_config(app.settings.root)
+        pad = {"padx": 22, "pady": (6, 0)}
+        W = 556
+        ctk.CTkLabel(self, text="Daily forecast e-mail", font=ctk.CTkFont(size=18, weight="bold")).pack(
+            anchor="w", padx=22, pady=(18, 2))
+        ctk.CTkLabel(self, text=("CandleCast forecasts your tickers every day at the chosen time and e-mails the "
+                                 "charts to you - sent from your own mailbox, nothing passes through anyone "
+                                 "else's server. Your PC must be on (or asleep); a missed run is sent when it "
+                                 "wakes."), wraplength=W, justify="left", text_color=MUTED).pack(anchor="w", **pad)
+        self.address = ctk.CTkEntry(self, width=W, placeholder_text="Your e-mail address (e.g. you@gmail.com)")
+        self.address.pack(**pad)
+        self.password = ctk.CTkEntry(self, width=W, show="•",
+                                     placeholder_text="App password (saved encrypted; leave empty to keep the saved one)")
+        self.password.pack(**pad)
+        self.hint = ctk.CTkLabel(self, text="", wraplength=W, justify="left", text_color=MUTED, cursor="hand2")
+        self.hint.pack(anchor="w", **pad)
+        self.hint.bind("<Button-1>", lambda _e: self._open_help())
+        self.to = ctk.CTkEntry(self, width=W, placeholder_text="Send to (optional; default = your address)")
+        self.to.pack(**pad)
+        self.tickers = ctk.CTkEntry(self, width=W, placeholder_text="Tickers, e.g. AAPL, SPY, BTCUSD")
+        self.tickers.pack(**pad)
+        row = ctk.CTkFrame(self, fg_color="transparent")
+        row.pack(fill="x", padx=22, pady=(10, 0))
+        ctk.CTkLabel(row, text="Timeframe", text_color=MUTED).pack(side="left", padx=(0, 6))
+        self.tf = ctk.CTkSegmentedButton(row, values=list(TIMEFRAME_LABELS))
+        self.tf.pack(side="left")
+        ctk.CTkLabel(row, text="Bars", text_color=MUTED).pack(side="left", padx=(16, 6))
+        self.bars = ctk.CTkEntry(row, width=56)
+        self.bars.pack(side="left")
+        ctk.CTkLabel(row, text="Time", text_color=MUTED).pack(side="left", padx=(16, 6))
+        self.time = ctk.CTkEntry(row, width=70, placeholder_text="08:00")
+        self.time.pack(side="left")
+        self.enabled = ctk.CTkSwitch(self, text="Send every day")
+        self.enabled.pack(anchor="w", padx=22, pady=(14, 0))
+        self.status = ctk.CTkLabel(self, text="", wraplength=W, justify="left", text_color=MUTED)
+        self.status.pack(anchor="w", padx=22, pady=(12, 0))
+        buttons = ctk.CTkFrame(self, fg_color="transparent")
+        buttons.pack(fill="x", padx=22, pady=(14, 0))
+        self.test_btn = ctk.CTkButton(buttons, text="Send a test e-mail now", width=190, fg_color="transparent",
+                                      border_width=1, text_color=("#0b0b0b", "#ffffff"), command=self.send_now)
+        self.test_btn.pack(side="left")
+        ctk.CTkButton(buttons, text="Save", width=110, fg_color=ACCENT, command=self.save).pack(side="right")
+
+        self.address.insert(0, cfg.address)
+        if cfg.to and cfg.to != cfg.address:
+            self.to.insert(0, cfg.to)
+        self.tickers.insert(0, ", ".join(cfg.tickers) or self.app.tickers.get())
+        self.tf.set(cfg.timeframe.upper() if cfg.timeframe.upper() in TIMEFRAME_LABELS else "1D")
+        self.bars.insert(0, str(cfg.bars))
+        self.time.insert(0, cfg.time)
+        if cfg.enabled:
+            self.enabled.select()
+        self.address.bind("<KeyRelease>", lambda _e: self._update_hint())
+        self._update_hint()
+        if emailer.load_password(app.settings.root):
+            self.status.configure(text="A password is saved." + (" Daily e-mail is scheduled." if
+                                                                 emailer.is_scheduled() else ""))
+
+    def _update_hint(self):
+        address = self.address.get().strip()
+        if "@" not in address:
+            self.hint.configure(text="Enter your address to see which password your provider needs.",
+                                text_color=MUTED)
+            self._help_url = None
+            return
+        host, port, _mode, help_url = self.em.provider_for(address)
+        if "gmail" in host:
+            text = ("Gmail: use an app password, not your normal password (Google's rule for mail apps). Click "
+                    "here, create one named CandleCast and paste the 16 letters above. Needs 2-Step Verification.")
+        elif "outlook" in host:
+            text = ("Outlook/Hotmail: Microsoft has switched off password sign-in for mail apps on most personal "
+                    "accounts, so this may be refused. A Gmail address is the easiest choice.")
+        else:
+            text = f"Server {host}:{port}. Most providers need an app password (click for your provider's page)."
+        self.hint.configure(text=text, text_color=ACCENT if help_url else MUTED)
+        self._help_url = help_url
+
+    def _open_help(self):
+        if self._help_url:
+            webbrowser.open(self._help_url)
+
+    def _config(self):
+        tickers, _ = parse_tickers(self.tickers.get())
+        bars = int(self.bars.get().strip() or 16)
+        if not timeframes.MIN_PRED <= bars <= timeframes.MAX_PRED:
+            raise ValueError(f"Bars must be {timeframes.MIN_PRED}-{timeframes.MAX_PRED}.")
+        hh, _, mm = (self.time.get().strip() or "08:00").partition(":")
+        if not (hh.isdigit() and (mm or "0").isdigit() and 0 <= int(hh) < 24 and 0 <= int(mm or 0) < 60):
+            raise ValueError("Time must be HH:MM, e.g. 08:00.")
+        time_text = f"{int(hh):02d}:{int(mm or 0):02d}"
+        address = self.address.get().strip()
+        if "@" not in address:
+            raise ValueError("Enter your e-mail address.")
+        if not tickers:
+            raise ValueError("Enter at least one ticker.")
+        old = self.em.load_config(self.app.settings.root)
+        return self.em.EmailConfig(
+            address=address, to=self.to.get().strip(), tickers=tickers, timeframe=self.tf.get().lower(),
+            bars=bars, history=int(self.app.history.get()), paths=int(self.app.paths.get()),
+            band_level=old.band_level, time=time_text, enabled=bool(self.enabled.get()), server=old.server)
+
+    def _store(self):
+        cfg = self._config()
+        if self.password.get().strip():
+            self.em.store_password(self.password.get(), root=self.app.settings.root)
+        elif not self.em.load_password(self.app.settings.root):
+            raise ValueError("Enter the (app) password for your mailbox.")
+        self.em.save_config(cfg, root=self.app.settings.root)
+        return cfg
+
+    def save(self):
+        try:
+            cfg = self._store()
+            if cfg.enabled:
+                self.em.schedule(cfg.time)
+                msg = (f"Saved. Every day at {cfg.time} CandleCast will e-mail {', '.join(cfg.tickers)} "
+                       f"to {cfg.recipient}.")
+            else:
+                self.em.unschedule()
+                msg = "Saved. Daily e-mail is off."
+            self.status.configure(text=msg, text_color=GOOD)
+            self.app.log(msg)
+        except Exception as exc:
+            self.status.configure(text=str(exc), text_color=BAD)
+
+    def send_now(self):
+        if self.app.runner.busy:
+            self.status.configure(text="A forecast is running - try again when it finishes.", text_color=BAD)
+            return
+        try:
+            cfg = self._store()
+        except Exception as exc:
+            self.status.configure(text=str(exc), text_color=BAD)
+            return
+        self.test_btn.configure(state="disabled", text="Sending ...")
+        self.status.configure(text="Forecasting and sending - this takes about as long as a normal run ...",
+                              text_color=MUTED)
+        self.app.runner.busy = True
+
+        def work():
+            try:
+                result = (True, self.em.run_report(self.app.settings, cfg, runner=self.app.runner,
+                                                   log_fn=lambda m: self.app.q.put(("log", m))))
+            except Exception as exc:  # shown in the dialog
+                logging.getLogger(__name__).exception("test e-mail failed")
+                result = (False, str(exc))
+            self.app.runner.busy = False
+            self.after(0, lambda: self._sent(*result))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _sent(self, ok: bool, text: str):
+        if not self.winfo_exists():
+            return
+        self.test_btn.configure(state="normal", text="Send a test e-mail now")
+        self.status.configure(text=text, text_color=GOOD if ok else BAD)
 
 
 class AboutDialog(ctk.CTkToplevel):
@@ -218,8 +419,7 @@ class CandleCastApp(ctk.CTk):
                  autorun: bool = False, timeframe: str | None = None, bars: int | None = None):
         super().__init__()
         if settings is None:
-            chosen = load_prefs().get("model")
-            settings = load_settings(model_name=chosen if chosen in ALLOWED_MODELS else None)
+            settings = settings_from_prefs()
         self.settings = settings
         self.q: queue.Queue = queue.Queue()
         self.runner = runner or ForecastRunner(self.settings, log=lambda m: self.q.put(("log", m)))
@@ -287,8 +487,15 @@ class CandleCastApp(ctk.CTk):
         bottom.grid(row=4, column=0, sticky="ew", padx=16, pady=16)
         ctk.CTkButton(bottom, text="Settings", fg_color="transparent", border_width=1,
                       text_color=("#0b0b0b", "#ffffff"), command=lambda: SettingsDialog(self)).pack(fill="x")
+        ctk.CTkButton(bottom, text="Daily e-mail", fg_color="transparent", border_width=1,
+                      text_color=("#0b0b0b", "#ffffff"), command=lambda: EmailDialog(self)).pack(fill="x", pady=(8, 0))
         ctk.CTkButton(bottom, text="About", fg_color="transparent", border_width=1,
                       text_color=("#0b0b0b", "#ffffff"), command=lambda: AboutDialog(self)).pack(fill="x", pady=(8, 0))
+        ctk.CTkLabel(bottom, text="Price data", text_color=MUTED, font=ctk.CTkFont(size=11)).pack(anchor="w", pady=(14, 2))
+        self.net = ctk.CTkSegmentedButton(bottom, values=["Online", "Offline"],
+                                          command=lambda v: self.set_offline(v == "Offline"))
+        self.net.set("Offline" if self.settings.offline else "Online")
+        self.net.pack(fill="x")
         ctk.CTkLabel(bottom, text="Appearance", text_color=MUTED, font=ctk.CTkFont(size=11)).pack(anchor="w", pady=(14, 2))
         self.mode = ctk.CTkSegmentedButton(bottom, values=["Light", "Dark", "System"], command=self.on_mode)
         self.mode.set("System")
@@ -427,21 +634,40 @@ class CandleCastApp(ctk.CTk):
         ctk.set_appearance_mode(value.lower())
         self.after(50, self.show_selected)
 
-    def set_model(self, name: str) -> bool:
-        """Switch between Kronos-base and Kronos-small; remembered for next time. Returns True if changed."""
-        if name not in ALLOWED_MODELS or name == self.settings.model.name:
+    def set_model(self, name: str, repo: str | None = None) -> bool:
+        """Switch model (base / small / custom checkpoint); remembered for next time. Returns True if changed.
+        Raises ValueError for a custom model without a location."""
+        if name not in (*ALLOWED_MODELS, CUSTOM_MODEL):
+            return False
+        new = with_model(self.settings, name, repo)
+        if new.model.repo == self.settings.model.repo and name == self.settings.model.name:
             return False
         if self.runner.busy:
             self.log("Finish the current forecast before switching models.")
             return False
-        save_prefs({"model": name}, root=self.settings.root)
+        prefs = {"model": name}
+        if name == CUSTOM_MODEL:
+            prefs["custom_repo"] = new.model.repo
+        save_prefs(prefs, root=self.settings.root)
+        self.settings = new   # only the model changes; paths etc. stay
+        self.runner = ForecastRunner(self.settings, log=lambda m: self.q.put(("log", m)))
+        shown = new.model.repo if name == CUSTOM_MODEL else f"Kronos-{name}"
+        self.log(f"Model switched to {shown}; it loads (and downloads once, if needed) with the next forecast.")
+        return True
+
+    def set_offline(self, offline: bool) -> None:
+        """Offline: forecasts use only prices and models already on this PC (no internet access)."""
         from dataclasses import replace  # noqa: PLC0415
 
-        model = replace(self.settings.model, name=name, repo=self.settings.model_repos[name])
-        self.settings = replace(self.settings, model=model)   # only the model changes; paths etc. stay
-        self.runner = ForecastRunner(self.settings, log=lambda m: self.q.put(("log", m)))
-        self.log(f"Model switched to Kronos-{name}; it loads (and downloads once) with the next forecast.")
-        return True
+        if self.runner.busy:
+            self.log("Finish the current forecast before switching online/offline.")
+            self.net.set("Offline" if self.settings.offline else "Online")
+            return
+        self.settings = replace(self.settings, offline=bool(offline))
+        self.runner.settings = self.settings
+        save_prefs({"offline": bool(offline)}, root=self.settings.root)
+        self.log("Offline: using only the prices and model already on this PC." if offline else
+                 "Online: prices are refreshed from Alpaca / Yahoo before each forecast.")
 
     def refresh_key_banner(self):
         if has_alpaca_keys():
@@ -661,6 +887,35 @@ class CandleCastApp(ctk.CTk):
         self._resize_job = self.after(150, self.show_selected)
 
 
+def settings_from_prefs():
+    """Settings with the user's saved model and online/offline choice."""
+    from dataclasses import replace  # noqa: PLC0415
+
+    prefs = load_prefs()
+    chosen = prefs.get("model")
+    settings = load_settings(model_name=chosen if chosen in ALLOWED_MODELS else None)
+    if chosen == CUSTOM_MODEL and prefs.get("custom_repo"):
+        settings = with_model(settings, CUSTOM_MODEL, prefs["custom_repo"])
+    if prefs.get("offline"):
+        settings = replace(settings, offline=True)
+    return settings
+
+
+def email_report_main() -> int:
+    """Headless run for the scheduled task; everything goes to logs/app.log."""
+    from candlecast import emailer  # noqa: PLC0415
+
+    _setup_file_log()
+    lg = logging.getLogger("candlecast.email")
+    lg.info("CandleCast %s: daily e-mail run", __version__)
+    try:
+        emailer.run_report(settings_from_prefs(), log_fn=lg.info)
+        return 0
+    except Exception:
+        lg.exception("daily e-mail failed")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> None:
     import sys  # noqa: PLC0415
 
@@ -676,7 +931,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("tickers", nargs="*", help="fill these in and start forecasting immediately")
     parser.add_argument("--timeframe", "-t", choices=[t.lower() for t in TIMEFRAME_LABELS], type=str.lower)
     parser.add_argument("--bars", "-n", type=int, help=f"bars to forecast ({timeframes.MIN_PRED}-{timeframes.MAX_PRED})")
+    parser.add_argument("--email-report", action="store_true",
+                        help="no window: forecast the Daily e-mail tickers and send the e-mail (scheduled task)")
     args, _unknown = parser.parse_known_args(sys.argv[1:] if argv is None else argv)
+    if args.email_report:
+        sys.exit(email_report_main())
     tickers, _ = parse_tickers(" ".join(args.tickers))
     _setup_file_log()
     logging.getLogger(__name__).info("CandleCast %s starting; data folder %s", __version__, DATA_DIR)

@@ -139,14 +139,17 @@ def load_bars(settings, inst, timeframe: str, required: int, source=None,
     from candlecast.sources import make_sources  # noqa: PLC0415
 
     now = now or pd.Timestamp.now(tz="UTC")
-    if source is None and inst.source is not None:
+    offline = bool(getattr(settings, "offline", False))
+    if offline:
+        source = None
+    elif source is None and inst.source is not None:
         try:
             source = make_sources()[inst.source]()
         except Exception as exc:  # e.g. missing Alpaca keys: fall back to the local database
             log.warning("%s: data source unavailable (%s); using local bars only", inst.ticker, exc)
 
     if timeframe in ("1h", "4h"):
-        note = "local 1h database"
+        note = "local 1h database (offline mode)" if offline else "local 1h database"
         if source is not None:
             try:
                 r = update_instrument(inst, source, settings.data, settings.bars_dir, now=now)
@@ -164,7 +167,7 @@ def load_bars(settings, inst, timeframe: str, required: int, source=None,
     cached = read_cache(directory, inst.ticker)
     have = 0 if cached is None else len(cached)
     if source is None:
-        return cached, f"local {timeframe} database ({have} bars; offline)"
+        return cached, f"local {timeframe} database ({have} bars; {'offline mode' if offline else 'offline'})"
     try:
         if cached is None or have < required:
             start = now - pd.Timedelta(days=_lookback_days(timeframe, required))

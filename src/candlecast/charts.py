@@ -41,6 +41,16 @@ def time_format(timeframe: str) -> str:
     return "%a %Y-%m-%d" if timeframe in ("1d", "1w") else "%a %m/%d %H:%M"
 
 
+def thin_ticks(starts: list[int], min_gap: int) -> list[int]:
+    """Keep period starts at least ``min_gap`` bars apart (labels closer than that collide). Greedy from
+    the right, so the most recent period is always labelled."""
+    kept: list[int] = []
+    for s_ in reversed(starts):
+        if not kept or kept[-1] - s_ >= min_gap:
+            kept.append(s_)
+    return kept[::-1]
+
+
 def caption_for_test(test_row: dict, cutoff: pd.Timestamp, band: dict | None = None,
                      timeframe: str = "1h") -> str:
     """Two lines: what the test forecast was, and how it did (same metrics as `candlecast score`).
@@ -140,8 +150,7 @@ def render(path: Path, ticker: str, history: pd.DataFrame, summary: pd.DataFrame
     else:
         period, fmt = ts.dt.date.astype(str), "%a %m/%d"
     starts = [i for i in range(total) if i == 0 or period.iloc[i] != period.iloc[i - 1]]
-    min_gap = max(4, total // 14)  # labels closer than this collide; keep the later (full) period
-    starts = [s_ for k, s_ in enumerate(starts) if k + 1 == len(starts) or starts[k + 1] - s_ >= min_gap]
+    starts = thin_ticks(starts, min_gap=max(4, total // 14))
     ax.set_xticks(starts)
     ax.set_xticklabels([ts.iloc[i].strftime(fmt) for i in starts], fontsize=8, color=c["text_secondary"])
     ax.tick_params(axis="y", labelsize=8, colors=c["text_secondary"])

@@ -62,6 +62,22 @@ def test_app_window_runs_selects_and_exports(tf_settings, fake_model, tmp_path):
         assert win.set_model("small") and win.settings.model.name == "small"
         assert settings.load_prefs(tf_settings.root)["model"] == "small"
         assert not win.set_model("small") and not win.set_model("large")   # unchanged / not offered
+        win.set_offline(True)
+        assert win.settings.offline and win.runner.settings.offline and settings.load_prefs(tf_settings.root)["offline"]
+        win.set_offline(False)
+        with pytest.raises(ValueError):
+            win.set_model("custom", "  ")
+        assert win.set_model("custom", str(tmp_path / "kronos-large")) and win.settings.model.name == "custom"
+        assert settings.load_prefs(tf_settings.root)["custom_repo"].endswith("kronos-large")
+        win.update()
+        dlg = appmod.EmailDialog(win)
+        dlg.address.insert(0, "me@gmail.com")
+        dlg._update_hint()
+        assert "app password" in dlg.hint.cget("text")
+        win.after(400, win.quit)      # let the dialog finish drawing (as a person would) before closing it
+        win.mainloop()
+        dlg.destroy()
+        win.update()
         ctk.set_appearance_mode("dark")
         win.show_selected()                                   # re-renders the dark chart
         assert any(p.name.endswith("_dark.png") for p in (tf_settings.root / "outputs" / "app_charts").iterdir())

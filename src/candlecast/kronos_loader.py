@@ -89,7 +89,7 @@ def _is_complete(folder) -> bool:
     return (folder / "config.json").is_file() and any(folder.glob("*.safetensors"))
 
 
-def local_model_dir(repo: str) -> str:
+def local_model_dir(repo: str, offline: bool = False) -> str:
     """Folder with the repo's files, loaded without any network check once present.
 
     Downloads go to plain files in <data>/models/<owner--name> (``local_dir`` mode). The default Hugging
@@ -97,7 +97,13 @@ def local_model_dir(repo: str) -> str:
     is only used when a complete copy is already there (e.g. from a developer setup)."""
     from huggingface_hub import snapshot_download  # noqa: PLC0415
 
+    from pathlib import Path  # noqa: PLC0415
+
     ensure_console_streams()
+    if Path(repo).is_dir():   # a model folder on this PC (e.g. a checkpoint you trained or were given)
+        if not _is_complete(repo):
+            raise RuntimeError(f"{repo} has no config.json / *.safetensors - not a Kronos model folder")
+        return str(Path(repo))
     target = MODELS_DIR / repo.replace("/", "--")
     if (target / _COMPLETE).exists() and _is_complete(target):
         return str(target)
@@ -107,6 +113,9 @@ def local_model_dir(repo: str) -> str:
             return cached
     except Exception:  # not in the standard cache: download into our own folder
         pass
+    if offline:
+        raise RuntimeError(f"{repo} is not on this PC yet - switch Price data to Online once so it can be "
+                           "downloaded.")
     log.info("Downloading %s from Hugging Face (one time) ...", repo)
     target.mkdir(parents=True, exist_ok=True)
     snapshot_download(repo, local_dir=str(target), tqdm_class=_progress_class(repo.split("/")[-1]))
@@ -119,15 +128,15 @@ def local_model_dir(repo: str) -> str:
 
 
 @lru_cache(maxsize=2)
-def load_predictor(repo: str, tokenizer_repo: str, max_context: int):
+def load_predictor(repo: str, tokenizer_repo: str, max_context: int, offline: bool = False):
     """Load tokenizer + model once per process."""
     Kronos, KronosTokenizer, KronosPredictor = _import_kronos()
-    tokenizer = KronosTokenizer.from_pretrained(local_model_dir(tokenizer_repo))
-    model = Kronos.from_pretrained(local_model_dir(repo))
+    tokenizer = KronosTokenizer.from_pretrained(local_model_dir(tokenizer_repo, offline))
+    model = Kronos.from_pretrained(local_model_dir(repo, offline))
     tokenizer.eval()
     model.eval()
     return KronosPredictor(model, tokenizer, device="cpu", max_context=max_context)
 
 
-def predictor_for(model: ModelSettings):
-    return load_predictor(model.repo, model.tokenizer_repo, model.max_context)
+def predictor_for(model: ModelSettings, offline: bool = False):
+    return load_predictor(model.repo, model.tokenizer_repo, model.max_context, offline)
