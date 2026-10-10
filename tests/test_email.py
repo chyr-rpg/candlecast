@@ -114,3 +114,12 @@ def test_bad_login_explained():
 
     msg = emailer.explain_error(smtplib.SMTPAuthenticationError(535, b"bad"), emailer.EmailConfig(address="a@gmail.com"))
     assert "app password" in msg
+
+
+def test_dropped_connection_during_login_explained():
+    import smtplib
+
+    exc = smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+    exc.during_login = True
+    msg = emailer.explain_error(exc, emailer.EmailConfig(address="b@gmail.com"))
+    assert "b@gmail.com" in msg and "THIS Google account" in msg

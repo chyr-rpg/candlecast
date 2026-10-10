@@ -141,17 +141,25 @@ def send(cfg: EmailConfig, password: str, msg: EmailMessage, timeout: int = 60) 
     with server:
         if mode != "ssl":
             server.starttls(context=context)
-        server.login(cfg.address.strip(), password)
+        try:
+            server.login(cfg.address.strip(), password)
+        except smtplib.SMTPServerDisconnected as exc:
+            exc.during_login = True
+            raise
         server.send_message(msg)
 
 
 def explain_error(exc: Exception, cfg: EmailConfig) -> str:
     """A readable reason for a failed send."""
-    if isinstance(exc, smtplib.SMTPAuthenticationError):
+    # Gmail sometimes just drops the connection on a bad login instead of answering "535 rejected"
+    if isinstance(exc, smtplib.SMTPAuthenticationError) or (
+            isinstance(exc, smtplib.SMTPServerDisconnected) and getattr(exc, "during_login", False)):
         host = cfg.smtp()[0]
         if "gmail" in host:
-            return ("Gmail rejected the login. Gmail only accepts an *app password* here (16 letters, made at "
-                    "myaccount.google.com/apppasswords - needs 2-Step Verification), not your normal password.")
+            return (f"Gmail rejected the login for {cfg.address.strip()}. Use an app password (16 letters, made at "
+                    "myaccount.google.com/apppasswords) created while signed in to THIS Google account - not your "
+                    "normal password, and not one from another account. To send to a different inbox, put it "
+                    "in 'Send to'.")
         if "outlook" in host:
             return ("Outlook rejected the login. Microsoft has turned off password sign-in for SMTP on most "
                     "personal accounts; a Gmail address is the easiest alternative.")
