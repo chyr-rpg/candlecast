@@ -147,6 +147,31 @@ def load_settings(root: Path | None = None, model_name: str | None = None) -> Se
     )
 
 
+PREFS_FILE = "app_prefs.json"
+
+
+def load_prefs(root: Path | None = None) -> dict:
+    """Desktop-app preferences (e.g. {"model": "small"}) from the data folder; {} if none or unreadable."""
+    import json  # noqa: PLC0415
+
+    path = (Path(root) if root else DATA_DIR) / PREFS_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_prefs(updates: dict, root: Path | None = None) -> dict:
+    import json  # noqa: PLC0415
+
+    root = Path(root) if root else DATA_DIR
+    prefs = {**load_prefs(root), **updates}
+    root.mkdir(parents=True, exist_ok=True)
+    (root / PREFS_FILE).write_text(json.dumps(prefs, indent=2), encoding="utf-8")
+    return prefs
+
+
 def save_secrets(values: dict[str, str], root: Path | None = None) -> Path:
     """Write/replace keys in the data folder's .env (other lines are kept). Returns the .env path."""
     env_path = (Path(root) if root else DATA_DIR) / ".env"

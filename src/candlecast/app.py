@@ -33,7 +33,7 @@ from candlecast.panel import (
     resolve_tickers,
     save_as_jpg,
 )
-from candlecast.settings import DATA_DIR, load_secret, load_settings, save_secrets
+from candlecast.settings import ALLOWED_MODELS, DATA_DIR, load_prefs, load_secret, load_settings, save_prefs, save_secrets
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 ACCENT = ("#2a78d6", "#3987e5")
@@ -42,6 +42,8 @@ MUTED = ("#52514e", "#a9a89f")
 CARD = ("#ffffff", "#2e2e2d")
 TIMEFRAME_LABELS = ("1H", "4H", "1D", "1W")
 KRONOS_URL = "https://github.com/shiyu-coder/Kronos"
+MODEL_CHOICES = {"Kronos-base (default, larger and slower)": "base",
+                 "Kronos-small (about 3x faster, smaller download)": "small"}
 ALPACA_URL = "https://alpaca.markets/"
 
 
@@ -117,7 +119,7 @@ class SettingsDialog(ctk.CTkToplevel):
         super().__init__(app)
         self.app = app
         self.title("CandleCast settings")
-        self.geometry("560x420")
+        self.geometry("560x560")
         self.resizable(False, False)
         self.transient(app)
         self.after(150, self.grab_set)
@@ -138,6 +140,15 @@ class SettingsDialog(ctk.CTkToplevel):
             self.key.insert(0, load_secret("ALPACA_API_KEY_ID"))
         if load_secret("ALPACA_API_SECRET_KEY"):
             self.secret.insert(0, load_secret("ALPACA_API_SECRET_KEY"))
+        ctk.CTkLabel(self, text="Forecasting model", font=ctk.CTkFont(size=18, weight="bold")).pack(
+            anchor="w", padx=22, pady=(18, 2))
+        current = next((k for k, v in MODEL_CHOICES.items() if v == app.settings.model.name), None)
+        self.model = ctk.CTkOptionMenu(self, values=list(MODEL_CHOICES), width=510)
+        self.model.set(current or next(iter(MODEL_CHOICES)))
+        self.model.pack(**pad)
+        ctk.CTkLabel(self, text=("Each model downloads once (base ~410 MB). Kronos-large is not publicly released "
+                                 "by its authors, so it cannot be offered."), wraplength=510, justify="left",
+                     text_color=MUTED).pack(anchor="w", **pad)
         self.status = ctk.CTkLabel(self, text="", text_color=MUTED, wraplength=510, justify="left")
         self.status.pack(anchor="w", padx=22, pady=(10, 0))
         row = ctk.CTkFrame(self, fg_color="transparent")
@@ -170,6 +181,7 @@ class SettingsDialog(ctk.CTkToplevel):
     def save(self):
         self._apply()
         path = save_secrets({"ALPACA_API_KEY_ID": self.key.get(), "ALPACA_API_SECRET_KEY": self.secret.get()})
+        self.app.set_model(MODEL_CHOICES[self.model.get()])
         self.status.configure(text=f"Saved to {path}", text_color=GOOD)
         self.app.refresh_key_banner()
         self.after(700, self.destroy)
@@ -190,9 +202,9 @@ class AboutDialog(ctk.CTkToplevel):
         text = ("Probabilistic price forecasts on your desktop, powered by the open-source Kronos foundation "
                 "model (MIT licence). Every chart also shows a test forecast made N bars ago, so you can see how "
                 "the model did on prices that already happened.\n\n"
-                "Not financial advice. In our own backtests (see the project's benchmarks folder) Kronos did not "
-                "beat a simple 'no change' guess on price direction; use the bands as an illustration of "
-                "uncertainty, not as trading signals.\n\nFree and open source under the MIT licence.")
+                "Shared for learning and information only - not a trading signal or investment advice. To push "
+                "the forecasts further, try training or fine-tuning Kronos on your own data (the Kronos "
+                "repository includes fine-tuning scripts).\n\nFree and open source under the MIT licence.")
         ctk.CTkLabel(self, text=text, wraplength=500, justify="left", text_color=MUTED).pack(padx=26, pady=12)
         link = ctk.CTkLabel(self, text="Kronos on GitHub", text_color=ACCENT, cursor="hand2")
         link.pack()
@@ -205,7 +217,10 @@ class CandleCastApp(ctk.CTk):
     def __init__(self, settings=None, runner: ForecastRunner | None = None, tickers: list[str] | None = None,
                  autorun: bool = False, timeframe: str | None = None, bars: int | None = None):
         super().__init__()
-        self.settings = settings or load_settings()
+        if settings is None:
+            chosen = load_prefs().get("model")
+            settings = load_settings(model_name=chosen if chosen in ALLOWED_MODELS else None)
+        self.settings = settings
         self.q: queue.Queue = queue.Queue()
         self.runner = runner or ForecastRunner(self.settings, log=lambda m: self.q.put(("log", m)))
         self.results: list[Result] = []
@@ -411,6 +426,22 @@ class CandleCastApp(ctk.CTk):
     def on_mode(self, value):
         ctk.set_appearance_mode(value.lower())
         self.after(50, self.show_selected)
+
+    def set_model(self, name: str) -> bool:
+        """Switch between Kronos-base and Kronos-small; remembered for next time. Returns True if changed."""
+        if name not in ALLOWED_MODELS or name == self.settings.model.name:
+            return False
+        if self.runner.busy:
+            self.log("Finish the current forecast before switching models.")
+            return False
+        save_prefs({"model": name}, root=self.settings.root)
+        from dataclasses import replace  # noqa: PLC0415
+
+        model = replace(self.settings.model, name=name, repo=self.settings.model_repos[name])
+        self.settings = replace(self.settings, model=model)   # only the model changes; paths etc. stay
+        self.runner = ForecastRunner(self.settings, log=lambda m: self.q.put(("log", m)))
+        self.log(f"Model switched to Kronos-{name}; it loads (and downloads once) with the next forecast.")
+        return True
 
     def refresh_key_banner(self):
         if has_alpaca_keys():
@@ -633,6 +664,9 @@ class CandleCastApp(ctk.CTk):
 def main(argv: list[str] | None = None) -> None:
     import sys  # noqa: PLC0415
 
+    from candlecast.kronos_loader import ensure_console_streams  # noqa: PLC0415
+
+    ensure_console_streams()   # windowed app: no console; progress bars must not crash it
     _set_windows_app_id()
     ctk.set_appearance_mode("system")
     ctk.set_default_color_theme("blue")

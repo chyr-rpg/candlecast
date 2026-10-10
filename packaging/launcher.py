@@ -15,6 +15,9 @@ def _crash_log(exc_text: str) -> None:
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
+    for _name in ("stdout", "stderr"):   # windowed exe: no console streams (see kronos_loader)
+        if getattr(sys, _name) is None:
+            setattr(sys, _name, open(os.devnull, "w", encoding="utf-8"))
     try:
         from candlecast.app import main
 

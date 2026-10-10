@@ -5,34 +5,162 @@
 <h1 align="center">CandleCast</h1>
 
 <p align="center">
-  Probabilistic price forecasts on your Windows desktop, powered by the open-source
-  <a href="https://github.com/shiyu-coder/Kronos">Kronos</a> foundation model - with a built-in
-  <b>test window</b> that shows how the same forecast did on prices that already happened.
+  A desktop tool for exploring probabilistic market forecasts with the open-source
+  <a href="https://github.com/shiyu-coder/Kronos">Kronos</a> time-series foundation model.
 </p>
 
 <p align="center">
   <img src="docs/screenshots/candlecast-dark.png" alt="CandleCast in dark mode" width="900">
 </p>
 
-> **For fun and study - not financial advice.** In our own backtests (see [Accuracy](#accuracy)) Kronos
-> did not beat a simple "price stays where it is" guess. CandleCast is built to make that visible, not hide it.
+> CandleCast is shared for learning and information only - it is not a trading signal or investment
+> advice. If you want to push the forecasts further, I'd encourage training or fine-tuning Kronos on your
+> own data; the [Kronos repository](https://github.com/shiyu-coder/Kronos) includes fine-tuning scripts.
+
+## Why I built it
+
+CandleCast started from a question I had when experimenting with Kronos:
+
+> **What does a model-generated price forecast actually tell me once I compare it with what happened afterwards?**
+
+It is quite easy to generate a forecast and draw it into the future. What interested me more was whether that
+forecast actually contained useful information, and how I could see that without simply looking at a
+good-looking chart.
+
+So I built CandleCast around two views.
+
+The first is the normal forecast view: Kronos generates multiple possible future price paths, and CandleCast
+shows the median forecast together with an uncertainty band.
+
+The second is what I call the **test window**. CandleCast moves the same forecasting process back in time, only
+gives the model information that would have been available at that point, and then compares its forecast with
+what actually happened afterwards.
+
+That became more important as I started testing Kronos more seriously.
+
+Across the benchmark experiments in this repository, Kronos did not consistently beat a simple no-change
+forecast on price error. Its original uncertainty bands were also much narrower than their stated coverage
+suggested.
+
+I also found one daily stock-ranking setup that initially looked quite interesting. Instead of treating that
+result as an edge, I wrote down a confirmation test in advance and repeated it on a much larger group of stocks
+that had not been used in the original experiment.
+
+The result did not replicate.
+
+I decided to keep those findings visible rather than design CandleCast around the best-looking examples.
+
+For me, the project is therefore less about asking:
+
+> **Where will the market go next?**
+
+and more about asking:
+
+> **What does the model expect, how uncertain is it, and how has the same forecasting process behaved when we
+> could actually check the answer?**
 
 ## What it does
 
-- Type any **US stock or ETF** (e.g. `AAPL, NVDA, SPY`), crypto (`BTCUSD`, `ETHUSD`), gold/silver/oil
-  (`XAUUSD`, `XAGUSD`, `WTI`, `BRENT`) or major FX pairs (`EURUSD`, `USDJPY`, ...).
-- Pick a **timeframe** - 1 hour, 4 hours, 1 day or 1 week - and how many **bars** to forecast (4-128).
-- CandleCast samples 50-200 possible future price paths with Kronos and draws:
-  - the **forecast** (blue): median path and a calibrated 40-80% band of the next N bars;
-  - the **test window** (orange): the same forecast made N bars ago, using only data up to then,
-    drawn against what actually happened - scored against a "no change" guess.
-- Switch the band level, light/dark mode, and **save any chart as a JPG**.
-- Everything runs **locally on your CPU** - no account with us, no cloud service. Prices are downloaded
-  from Alpaca (your own free keys) and Yahoo Finance and kept in a local database.
+Enter a market symbol, choose a timeframe, and decide how many bars ahead you want the model to forecast.
+
+CandleCast then uses Kronos to generate a number of possible future price paths and displays their median
+together with an uncertainty range.
+
+What makes the app slightly different is the **test window**.
+
+Alongside the current forecast, CandleCast runs the same process from an earlier point in the data, without
+allowing the model to see what happened next. The historical forecast is then plotted against the prices that
+actually followed.
+
+This gives you two things to look at:
+
+- **Forecast** - what Kronos currently expects over the next N bars.
+- **Test window** - how the same setup behaved over a historical period where the outcome is already known.
+
+The app currently supports US stocks and ETFs, major FX pairs, crypto, gold, silver and oil, on 1-hour, 4-hour,
+daily and weekly bars. You can also adjust the forecast horizon, the history length, the number of sampled
+paths, the uncertainty-band level and the model (Kronos-base or Kronos-small), and save any chart as a JPG.
+
+CandleCast runs locally on Windows. Forecast generation is done on your CPU, while market data is downloaded
+from Alpaca or Yahoo Finance and cached locally.
 
 <p align="center">
   <img src="docs/screenshots/candlecast-light.png" alt="CandleCast in light mode" width="760">
 </p>
+
+## What I found while testing it
+
+Once the app was working, I wanted to know whether the forecasts were actually useful rather than only visually
+convincing.
+
+I therefore kept a separate set of benchmark experiments under [`benchmarks/`](benchmarks/). The current research
+record contains roughly 6,800 out-of-sample forecasts across different bar sizes, history lengths and sampling
+settings.
+
+A few findings changed how I looked at the model and, eventually, how I designed CandleCast.
+
+### Price forecasting was harder than the charts suggested
+
+Across the configurations I tested, Kronos did not beat a simple no-change assumption on price error.
+
+That was important because a forecast chart can still look reasonable even when it is not adding much
+information over a very simple baseline. This is one reason I kept the historical test window inside the app:
+I wanted the forecast to be shown together with something that makes it easier to judge.
+
+### One promising ranking result did not survive a second test
+
+I also tested whether Kronos might be more useful for ranking stocks by expected return rather than predicting
+their exact future prices.
+
+One daily configuration initially produced a mean RankIC of around +0.129, with a t-statistic close to 2. That
+looked interesting, but it was also the strongest result among a number of configurations I had tested, so I did
+not want to treat it as evidence immediately.
+
+I wrote down a confirmation test before running it, fixed the model settings and pass criteria, and tested the
+same idea on 103 instruments the original experiment had not used.
+
+The result went in the opposite direction:
+
+- Mean RankIC: **-0.083**
+- t-statistic: **-1.84**
+
+The original result did not replicate, so I currently treat it as noise rather than a trading edge.
+
+[Read the pre-registered confirmation test ->](benchmarks/CONFIRMATION_q5_PLAN.md)
+
+### The uncertainty bands needed calibration
+
+Another issue appeared when I looked at forecast coverage. Kronos's raw 80% band contained only around 40% of
+realised outcomes in my tests - the model's raw uncertainty range was considerably too narrow for the data I
+tested.
+
+CandleCast therefore includes calibrated bands based on historical forecast errors. The current calibration was
+fitted using 640 historical 1-hour, 32-bar forecasts. For other timeframe and forecast-horizon combinations, the
+app marks the calibrated band as approximate rather than assuming the same adjustment must work everywhere.
+
+### Simpler volatility models were difficult to beat
+
+I also compared Kronos's forecast dispersion with more traditional volatility models. In the current
+experiments, GARCH(1,1) produced better volatility forecasts than Kronos across the setups I tested.
+
+I do not see that as making the project unsuccessful. It changed the question I became interested in. Instead of
+asking whether a foundation model automatically gives a better market forecast, I am now more interested in
+understanding:
+
+**What information does the model actually capture, where does it fail, and are those failures systematic enough
+to learn something from?**
+
+That is also why the benchmark results remain part of this repository rather than being separated from the
+application.
+
+### Research record
+
+The [`benchmarks/`](benchmarks/) folder contains the experiments behind the observations above: out-of-sample price
+forecasting tests, stock-ranking experiments, uncertainty-band calibration, comparisons with GARCH and EWMA,
+sampling-stability and performance benchmarks, and the pre-registered confirmation experiment.
+
+The purpose is not to prove that Kronos works as a trading model. It is to keep a transparent record of what I
+tested, what appeared promising, and what failed when tested again.
 
 ## Install (Windows 10/11, 64-bit)
 
@@ -42,14 +170,21 @@
    app is from an unknown publisher (it is not code-signed); choose *More info -> Run anyway*.
 3. Start **CandleCast** from the Start menu.
 
-The first forecast downloads the Kronos model (~410 MB) once; after that it loads in 10-30 seconds.
-A forecast takes roughly 30-90 seconds per ticker on a typical laptop CPU.
+The first forecast downloads the chosen Kronos model once (Kronos-base about 410 MB; progress is shown in the
+app). After that it loads from disk in a few seconds. A forecast takes roughly 30-90 seconds per ticker on a
+typical laptop CPU with Kronos-base, faster with Kronos-small.
 
 ### Free Alpaca keys (for US stocks and ETFs)
 
 US stock prices come from [Alpaca](https://alpaca.markets/). Create a free account, generate a key pair
 (paper-trading keys are fine), and paste them into **Settings** in CandleCast. Crypto, metals, oil and FX
 work without any keys. Keys are stored only on your computer, in `%LOCALAPPDATA%\CandleCast\.env`.
+
+### Model choice
+
+**Settings** lets you switch between **Kronos-base** (default, larger and slower) and **Kronos-small** (about
+three times faster). Kronos-large has not been publicly released by its authors, so it is not offered. The
+band calibration was fitted on Kronos-base forecasts.
 
 ## How the forecast works
 
@@ -61,43 +196,21 @@ work without any keys. Keys are stored only on your computer, in `%LOCALAPPDATA%
 | **Paths** | How many futures Kronos samples; more = smoother bands, slower |
 | **Band** | Calibrated 40-80% range, or Kronos's raw band |
 
-Kronos's own 80% band turned out to contain only ~40% of real outcomes, so CandleCast widens it with
-factors fitted on 640 past test forecasts ([`config/band_calibration.json`](config/band_calibration.json)).
-The factors were fitted on 1-hour x 32-bar forecasts; for other combinations the app marks them
-*approximate* and the test window shows how well they held.
-
-Why history is fixed: Kronos generates bar by bar, so with the same history the first 16 bars of a
-27-bar forecast are identical to a 16-bar forecast. Changing the *history* is what changes the path -
-Kronos tends to pull forecasts toward the average of the window it sees, so a longer window can even flip
-the direction. Try the History slider to see how sensitive a given forecast is. (Averaging several
-history lengths did not improve accuracy in our backtests, so CandleCast does not do it.)
+Why history is fixed: Kronos generates bar by bar, so with the same history the first 16 bars of a 27-bar
+forecast are identical to a 16-bar forecast. Changing the *history* is what changes the path - Kronos tends to
+pull forecasts toward the average of the window it sees, so a longer window can even flip the direction. Try the
+History slider to see how sensitive a given forecast is. (Averaging several history lengths did not improve
+accuracy in my backtests, so CandleCast does not do it.)
 
 Data is cached per timeframe in `%LOCALAPPDATA%\CandleCast\data` and refreshed online each run; if the
 download fails the local copy is used.
-
-## Accuracy
-
-The [`benchmarks/`](benchmarks/) folder holds the research record behind CandleCast: about 6,800 out-of-sample
-test forecasts across hourly, 4-hour and daily bars, several history lengths and sampling settings, a ranking
-test the way the Kronos paper evaluates it, a volatility comparison against GARCH/EWMA, and a
-[pre-registered confirmation test](benchmarks/CONFIRMATION_q5_PLAN.md). Summary:
-
-- No configuration beat the "no change" baseline on price error.
-- Ranking stocks by expected return showed no skill once tested on new stocks.
-- GARCH(1,1) forecast volatility better than Kronos in every setup.
-- On daily/weekly bars Kronos tends to pull forecasts back toward the average of its input window,
-  which shows up clearly in the test window.
-
-Independent users report similar results ([#354](https://github.com/shiyu-coder/Kronos/issues/354),
-[#355](https://github.com/shiyu-coder/Kronos/issues/355)). CandleCast is a tool to explore and learn from
-a time-series foundation model - treat its charts as an illustration of uncertainty.
 
 ## Run from source / build the installer
 
 Requires Python 3.11 on Windows.
 
 ```powershell
-git clone https://github.com/<you>/candlecast.git
+git clone https://github.com/chyr-rpg/candlecast.git
 cd candlecast
 py -3.11 -m venv .venv
 .venv\Scripts\python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -121,7 +234,7 @@ for research use - see `candlecast --help`.
 
 - Model: [Kronos](https://github.com/shiyu-coder/Kronos) by Shi Yu et al. ([paper](https://arxiv.org/abs/2508.02739)),
   MIT licence; code vendored unmodified in `vendor/kronos`, weights downloaded from Hugging Face
-  (`NeoQuasar/Kronos-base`, MIT).
+  (`NeoQuasar/Kronos-base`, `NeoQuasar/Kronos-small`, MIT).
 - CandleCast itself: MIT licence (see [LICENSE](LICENSE)); third-party components in
   [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - Market data: your own Alpaca account and Yahoo Finance (via yfinance) - their terms apply.

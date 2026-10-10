@@ -7,7 +7,7 @@ CandleCast is MIT-licensed (see `LICENSE`). It includes or downloads the followi
 - License: MIT, Copyright (c) 2025 ShiYu - full text in `vendor/kronos/LICENSE`.
 
 ## Kronos model weights (downloaded on first use, not redistributed)
-- `NeoQuasar/Kronos-base`, `NeoQuasar/Kronos-Tokenizer-base` on Hugging Face - MIT licence per the model cards.
+- `NeoQuasar/Kronos-base`, `NeoQuasar/Kronos-small`, `NeoQuasar/Kronos-Tokenizer-base` on Hugging Face - MIT licence per the model cards.
 
 ## Python libraries bundled in the Windows build
 | Library | Licence |

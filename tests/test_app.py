@@ -59,9 +59,29 @@ def test_app_window_runs_selects_and_exports(tf_settings, fake_model, tmp_path):
         from PIL import Image
         with Image.open(out) as im:
             assert im.format == "JPEG" and im.width > 1000
+        assert win.set_model("small") and win.settings.model.name == "small"
+        assert settings.load_prefs(tf_settings.root)["model"] == "small"
+        assert not win.set_model("small") and not win.set_model("large")   # unchanged / not offered
         ctk.set_appearance_mode("dark")
         win.show_selected()                                   # re-renders the dark chart
         assert any(p.name.endswith("_dark.png") for p in (tf_settings.root / "outputs" / "app_charts").iterdir())
     finally:
         ctk.set_appearance_mode("system")
         win.destroy()
+
+
+def test_prefs_roundtrip(tmp_path):
+    assert settings.load_prefs(tmp_path) == {}
+    settings.save_prefs({"model": "small"}, root=tmp_path)
+    assert settings.save_prefs({"theme": "dark"}, root=tmp_path) == {"model": "small", "theme": "dark"}
+    (tmp_path / settings.PREFS_FILE).write_text("not json", encoding="utf-8")
+    assert settings.load_prefs(tmp_path) == {}
+
+
+def test_ensure_console_streams_replaces_missing_streams(monkeypatch):
+    import sys
+
+    from candlecast import kronos_loader
+    monkeypatch.setattr(sys, "stderr", None)
+    kronos_loader.ensure_console_streams()
+    sys.stderr.write("progress bar output goes nowhere\n")      # would raise AttributeError before
