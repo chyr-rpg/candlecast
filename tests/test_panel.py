@@ -82,3 +82,38 @@ def test_panel_window_timeframe_band_and_jpg(tf_settings, fake_model, tmp_path):
             assert im.format == "JPEG" and im.width > 1000
     finally:
         root.destroy()
+
+
+def test_slow_ticker_warns_and_records_stacks(tmp_path, monkeypatch):
+    import time as _time
+
+    from candlecast import settings as st
+    monkeypatch.setattr(st, "DATA_DIR", tmp_path)
+    msgs = []
+    runner = panel.ForecastRunner.__new__(panel.ForecastRunner)
+    runner.log = msgs.append
+    runner.SLOW_AFTER_S = 1
+    done = runner._watch("AMZN")
+    _time.sleep(2.5)
+    done()
+    assert any("AMZN: still working" in m for m in msgs)
+    text = (tmp_path / "logs" / "slow_run_stacks.log").read_text(encoding="utf-8")
+    assert "AMZN started" in text and "File" in text          # thread stacks were written
+
+
+def test_alpaca_session_gets_default_timeout():
+    from candlecast import sources
+
+    seen = {}
+
+    class Session:
+        def request(self, method, url, **kwargs):
+            seen.update(kwargs)
+
+    class Client:
+        _session = Session()
+
+    client = sources._with_timeout(Client())
+    client._session.request("GET", "https://example.invalid")
+    assert seen["timeout"] == sources.HTTP_TIMEOUT
+    assert sources._with_timeout(client) is client                # wrapping twice is harmless

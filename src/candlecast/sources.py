@@ -41,6 +41,27 @@ def _bars_frame(response_df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     return df
 
 
+HTTP_TIMEOUT = (10, 60)   # seconds: connect, read - a stalled connection must fail, not hang forever
+
+
+def _with_timeout(client):
+    """alpaca-py sends requests without a timeout; give its session a default one."""
+    import functools  # noqa: PLC0415
+
+    session = getattr(client, "_session", None)
+    if session is not None and not getattr(session, "_candlecast_timeout", False):
+        original = session.request
+
+        @functools.wraps(original)
+        def request(method, url, **kwargs):
+            kwargs.setdefault("timeout", HTTP_TIMEOUT)
+            return original(method, url, **kwargs)
+
+        session.request = request
+        session._candlecast_timeout = True
+    return client
+
+
 class AlpacaStockSource:
     name = "alpaca_stock"
     min_delay = ALPACA_MIN_DELAY
@@ -52,7 +73,7 @@ class AlpacaStockSource:
             key, secret = load_secret("ALPACA_API_KEY_ID"), load_secret("ALPACA_API_SECRET_KEY")
             if not key or not secret:
                 raise SourceError("ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY missing from .env")
-            client = StockHistoricalDataClient(key, secret)
+            client = _with_timeout(StockHistoricalDataClient(key, secret))
         self.client = client
 
     def fetch(self, symbol: str, start: datetime, end: datetime, timeframe: str = "1h") -> pd.DataFrame:
@@ -74,7 +95,7 @@ class AlpacaCryptoSource:
         if client is None:
             from alpaca.data.historical import CryptoHistoricalDataClient  # noqa: PLC0415
 
-            client = CryptoHistoricalDataClient()  # crypto data needs no keys
+            client = _with_timeout(CryptoHistoricalDataClient())  # crypto data needs no keys
         self.client = client
 
     def fetch(self, symbol: str, start: datetime, end: datetime, timeframe: str = "1h") -> pd.DataFrame:

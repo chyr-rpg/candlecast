@@ -154,10 +154,46 @@ class ForecastRunner:
             else:
                 from candlecast.kronos_loader import configure_torch_threads, predictor_for  # noqa: PLC0415
 
-                self.log(f"Loading the Kronos-{self.settings.model.name} model - the very first time it downloads about 410 MB (a few minutes); after that it loads in ~10-30 s ...")
+                self.log(f"Loading the Kronos-{self.settings.model.name} model (downloaded once the first time, then loaded from disk) ...")
                 configure_torch_threads(self.settings.model.torch_threads)
                 self._predictor = predictor_for(self.settings.model)
         return self._predictor
+
+    SLOW_AFTER_S = 120   # a normal ticker takes 10-90 s
+
+    def _watch(self, ticker: str):
+        """While one ticker runs: tell the user if it is unusually slow, and write every thread's stack to
+        logs/slow_run_stacks.log (every 2 min) so a hang can be diagnosed afterwards."""
+        import faulthandler  # noqa: PLC0415
+        import threading  # noqa: PLC0415
+
+        from candlecast.settings import DATA_DIR  # noqa: PLC0415
+
+        t0 = time.perf_counter()
+        stop = threading.Event()
+
+        def heartbeat():
+            while not stop.wait(self.SLOW_AFTER_S):
+                self.log(f"{ticker}: still working after {time.perf_counter() - t0:.0f}s - slower than usual "
+                         "(network or CPU); details are recorded in logs/slow_run_stacks.log")
+
+        threading.Thread(target=heartbeat, daemon=True).start()
+        dump = None
+        try:
+            (DATA_DIR / "logs").mkdir(parents=True, exist_ok=True)
+            dump = open(DATA_DIR / "logs" / "slow_run_stacks.log", "a", encoding="utf-8")  # noqa: SIM115
+            dump.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} {ticker} started ===\n")
+            dump.flush()
+            faulthandler.dump_traceback_later(self.SLOW_AFTER_S, repeat=True, file=dump)
+        except (OSError, ValueError, RuntimeError):
+            pass
+
+        def done():
+            stop.set()
+            if dump is not None:
+                faulthandler.cancel_dump_traceback_later()
+                dump.close()
+        return done
 
     def run(self, instruments, spec: custom.Spec, n_paths: int, rerun: bool) -> list[Result]:
         predictor = self._predictor_once()
@@ -166,6 +202,8 @@ class ForecastRunner:
         try:
             for inst in instruments:
                 t0 = time.perf_counter()
+                self.log(f"{inst.ticker}: updating prices and forecasting ...")
+                unwatch = self._watch(inst.ticker)
                 try:
                     source = self._make_source(inst) if self._make_source else None
                     row, test, status = custom.run_one(self.settings, inst, spec, predictor, n_paths, con,
@@ -176,6 +214,8 @@ class ForecastRunner:
                 except Exception as exc:  # one ticker's failure never stops the others
                     self.log(f"{inst.ticker} {spec.label}: FAILED - {type(exc).__name__}: {exc}")
                     results.append(Result(inst.ticker, "failed", error=f"{inst.ticker}: {type(exc).__name__}: {exc}"))
+                finally:
+                    unwatch()
             return results
         finally:
             con.close()
