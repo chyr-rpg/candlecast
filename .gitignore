@@ -22,3 +22,4 @@ build_log.txt
 iscc_log.txt
 *.spec.bak
 models/
+logs/

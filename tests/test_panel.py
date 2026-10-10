@@ -87,10 +87,10 @@ def test_panel_window_timeframe_band_and_jpg(tf_settings, fake_model, tmp_path):
 def test_slow_ticker_warns_and_records_stacks(tmp_path, monkeypatch):
     import time as _time
 
-    from candlecast import settings as st
-    monkeypatch.setattr(st, "DATA_DIR", tmp_path)
+    from types import SimpleNamespace
     msgs = []
     runner = panel.ForecastRunner.__new__(panel.ForecastRunner)
+    runner.settings = SimpleNamespace(root=tmp_path)
     runner.log = msgs.append
     runner.SLOW_AFTER_S = 1
     done = runner._watch("AMZN")

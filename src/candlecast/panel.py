@@ -167,8 +167,6 @@ class ForecastRunner:
         import faulthandler  # noqa: PLC0415
         import threading  # noqa: PLC0415
 
-        from candlecast.settings import DATA_DIR  # noqa: PLC0415
-
         t0 = time.perf_counter()
         stop = threading.Event()
 
@@ -180,8 +178,9 @@ class ForecastRunner:
         threading.Thread(target=heartbeat, daemon=True).start()
         dump = None
         try:
-            (DATA_DIR / "logs").mkdir(parents=True, exist_ok=True)
-            dump = open(DATA_DIR / "logs" / "slow_run_stacks.log", "a", encoding="utf-8")  # noqa: SIM115
+            logs = self.settings.root / "logs"   # the data folder (a test's temp folder in tests)
+            logs.mkdir(parents=True, exist_ok=True)
+            dump = open(logs / "slow_run_stacks.log", "a", encoding="utf-8")  # noqa: SIM115
             dump.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} {ticker} started ===\n")
             dump.flush()
             faulthandler.dump_traceback_later(self.SLOW_AFTER_S, repeat=True, file=dump)
