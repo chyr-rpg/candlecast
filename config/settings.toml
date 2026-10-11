@@ -1,7 +1,7 @@
-# Price_Forecast settings. Paths are relative to the project root unless absolute.
+# CandleCast settings. Paths are relative to the data folder unless absolute.
 
 [universe]
-# The owner's own list (column "ticker"; optional "exchange"). Missing or empty => default_tickers.
+# Your own list (column "ticker"; optional "exchange"). Missing or empty => default_tickers.
 watchlist_csv = "config/watchlist.csv"
 # Magnificent Seven + DIA, QQQ, SPY + gold + bitcoin.
 default_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA",
@@ -14,7 +14,7 @@ tokenizer_repo = "NeoQuasar/Kronos-Tokenizer-base"
 max_context = 512          # history fed = max_context - horizon, so the KV cache stays exact
 # 100 paths: p10/p90 sampling error ~5-13% of the band width (30 paths: 8-22%). Measured 2026-10-03.
 sample_paths = 100
-# Fastest on the i7-1355U (2P+8E cores): 8 threads 9.9s vs default 10 threads 11.8s (30 paths x 32 steps).
+# 8 threads was fastest on the 10-core laptop CPU it was tuned on (9.9s vs 11.8s with 10 threads, 30 paths x 32 steps).
 torch_threads = 8
 temperature = 1.0
 # Accuracy check 2026-10-03 (240 past forecasts): top_p 0.9 vs 1.0 made no difference; history 240 bars

@@ -7,10 +7,19 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy
 ROOT = Path(SPECPATH).parent          # noqa: F821 - SPECPATH is provided by PyInstaller
 ICON = str(ROOT / "src" / "candlecast" / "assets" / "candlecast.ico")
 
+
+
+def files(folder, dest, skip=()):
+    """Ship a folder file by file, never __pycache__ (it embeds the build machine's paths) or anything in skip."""
+    return [(str(p), str(Path(dest) / p.parent.relative_to(folder))) for p in sorted(folder.rglob("*"))
+            if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc" and p.name not in skip]
+
+
 datas = [
     (str(ROOT / "src" / "candlecast" / "assets"), "candlecast/assets"),
-    (str(ROOT / "config"), "config"),
-    (str(ROOT / "vendor" / "kronos"), "vendor/kronos"),
+    # config/watchlist.csv is the owner's personal list: never shipped (watchlist.example.csv is).
+    *files(ROOT / "config", "config", skip={"watchlist.csv"}),
+    *files(ROOT / "vendor" / "kronos", "vendor/kronos"),
     (str(ROOT / "LICENSE"), "."),
     (str(ROOT / "THIRD_PARTY_NOTICES.md"), "."),
 ]
