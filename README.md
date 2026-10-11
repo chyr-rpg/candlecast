@@ -52,6 +52,51 @@ I decided to keep those findings visible rather than design CandleCast around th
 
 For me, the project is therefore less about asking:
 
+---
+
+## Install (Windows 10/11, 64-bit)
+
+1. Download **`CandleCast-Setup-<version>.exe`** from the [latest release](../../releases/latest)
+   (or the portable zip, if you prefer not to install anything).
+2. Run it. It installs for your user only - no admin rights needed. Windows SmartScreen may warn that the
+   app is from an unknown publisher (it is not code-signed); choose *More info -> Run anyway*.
+3. Start **CandleCast** from the Start menu.
+
+The first forecast downloads the chosen Kronos model once (Kronos-base about 410 MB; progress is shown in the
+app). After that it loads from disk in a few seconds. A forecast takes roughly 30-90 seconds per ticker on a
+typical laptop CPU with Kronos-base, faster with Kronos-small.
+
+### Free Alpaca keys (for US stocks and ETFs)
+
+US stock prices come from [Alpaca](https://alpaca.markets/). Create a free account, generate a key pair
+(paper-trading keys are fine), and paste them into **Settings** in CandleCast. Crypto, metals, oil and FX
+work without any keys. Keys are stored only on your computer, in `%LOCALAPPDATA%\CandleCast\.env`.
+
+### Model choice
+
+**Settings** lets you switch between **Kronos-base** (default, larger and slower) and **Kronos-small** (about
+three times faster). Kronos-large has not been publicly released by its authors, so it cannot be downloaded;
+if you have or train a Kronos checkpoint, choose **Custom** and enter its folder or Hugging Face id. The band
+calibration was fitted on Kronos-base forecasts.
+
+### Online or offline
+
+The **Price data** switch in the sidebar chooses between **Online** (prices are refreshed from Alpaca / Yahoo
+before each forecast) and **Offline** (only the prices and model already on your PC are used - nothing is
+downloaded). The model always runs locally on your CPU either way.
+
+### Daily forecast e-mail
+
+**Daily e-mail** in the sidebar sends a forecast for your chosen tickers, timeframe and bar count to your inbox
+every day at a set time: a summary table plus the charts. CandleCast sends it from your own mailbox over SMTP,
+so nothing passes through a third-party server, and Windows Task Scheduler runs it (your PC must be on or
+asleep; a missed run is sent when it wakes). The only setup is your address and an **app password** - Gmail,
+Yahoo, iCloud and most providers require one for mail apps (Gmail: Google Account -> Security -> 2-Step
+Verification -> App passwords). The password is stored encrypted with Windows DPAPI. Outlook/Hotmail personal
+accounts mostly no longer allow password sign-in for mail apps.
+
+---
+
 > **Where will the market go next?**
 
 and more about asking:
@@ -162,46 +207,7 @@ sampling-stability and performance benchmarks, and the pre-registered confirmati
 The purpose is not to prove that Kronos works as a trading model. It is to keep a transparent record of what I
 tested, what appeared promising, and what failed when tested again.
 
-## Install (Windows 10/11, 64-bit)
-
-1. Download **`CandleCast-Setup-<version>.exe`** from the [latest release](../../releases/latest)
-   (or the portable zip, if you prefer not to install anything).
-2. Run it. It installs for your user only - no admin rights needed. Windows SmartScreen may warn that the
-   app is from an unknown publisher (it is not code-signed); choose *More info -> Run anyway*.
-3. Start **CandleCast** from the Start menu.
-
-The first forecast downloads the chosen Kronos model once (Kronos-base about 410 MB; progress is shown in the
-app). After that it loads from disk in a few seconds. A forecast takes roughly 30-90 seconds per ticker on a
-typical laptop CPU with Kronos-base, faster with Kronos-small.
-
-### Free Alpaca keys (for US stocks and ETFs)
-
-US stock prices come from [Alpaca](https://alpaca.markets/). Create a free account, generate a key pair
-(paper-trading keys are fine), and paste them into **Settings** in CandleCast. Crypto, metals, oil and FX
-work without any keys. Keys are stored only on your computer, in `%LOCALAPPDATA%\CandleCast\.env`.
-
-### Model choice
-
-**Settings** lets you switch between **Kronos-base** (default, larger and slower) and **Kronos-small** (about
-three times faster). Kronos-large has not been publicly released by its authors, so it cannot be downloaded;
-if you have or train a Kronos checkpoint, choose **Custom** and enter its folder or Hugging Face id. The band
-calibration was fitted on Kronos-base forecasts.
-
-### Online or offline
-
-The **Price data** switch in the sidebar chooses between **Online** (prices are refreshed from Alpaca / Yahoo
-before each forecast) and **Offline** (only the prices and model already on your PC are used - nothing is
-downloaded). The model always runs locally on your CPU either way.
-
-### Daily forecast e-mail
-
-**Daily e-mail** in the sidebar sends a forecast for your chosen tickers, timeframe and bar count to your inbox
-every day at a set time: a summary table plus the charts. CandleCast sends it from your own mailbox over SMTP,
-so nothing passes through a third-party server, and Windows Task Scheduler runs it (your PC must be on or
-asleep; a missed run is sent when it wakes). The only setup is your address and an **app password** - Gmail,
-Yahoo, iCloud and most providers require one for mail apps (Gmail: Google Account -> Security -> 2-Step
-Verification -> App passwords). The password is stored encrypted with Windows DPAPI. Outlook/Hotmail personal
-accounts mostly no longer allow password sign-in for mail apps.
+---
 
 ## How the forecast works
 
