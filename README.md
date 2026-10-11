@@ -52,6 +52,13 @@ I decided to keep those findings visible rather than design CandleCast around th
 
 For me, the project is therefore less about asking:
 
+> **Where will the market go next?**
+
+and more about asking:
+
+> **What does the model expect, how uncertain is it, and how has the same forecasting process behaved when we
+> could actually check the answer?**
+
 ---
 
 ## Install (Windows 10/11, 64-bit)
@@ -96,13 +103,6 @@ Verification -> App passwords). The password is stored encrypted with Windows DP
 accounts mostly no longer allow password sign-in for mail apps.
 
 ---
-
-> **Where will the market go next?**
-
-and more about asking:
-
-> **What does the model expect, how uncertain is it, and how has the same forecasting process behaved when we
-> could actually check the answer?**
 
 ## What it does
 
