@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/candlecast-dark.png" alt="CandleCast in dark mode" width="900">
+<img width="1917" height="1019" alt="image" src="https://github.com/user-attachments/assets/0281daf8-91bd-4f43-aacc-7dcf1292af3a" />  
 </p>
 
 > CandleCast is shared for learning and information only - it is not a trading signal or investment
@@ -19,38 +19,23 @@
 
 ## Why I built it
 
-CandleCast started from a question I had when experimenting with Kronos:
+CandleCast is an example on how we can more easily approach ML model outputs. 
+Personally, I am very interested in price forecast and want to experiment with Kronos:
 
 > **What does a model-generated price forecast actually tell me once I compare it with what happened afterwards?**
 
-It is quite easy to generate a forecast and draw it into the future. What interested me more was whether that
-forecast actually contained useful information, and how I could see that without simply looking at a
-good-looking chart.
+What interested me was whether a forecast actually contained useful information, and I want to see that in real time without just reading accuray metrics.
 
-So I built CandleCast around two views.
+So I built CandleCast around **two views**.
 
-The first is the normal forecast view: Kronos generates multiple possible future price paths, and CandleCast
+The first is the **forecast view**: Kronos generates multiple possible future price paths, and CandleCast
 shows the median forecast together with an uncertainty band.
 
-The second is what I call the **test window**. CandleCast moves the same forecasting process back in time, only
+The second is the **test window**. CandleCast moves the same forecasting process back in time, only
 gives the model information that would have been available at that point, and then compares its forecast with
 what actually happened afterwards.
 
-That became more important as I started testing Kronos more seriously.
-
-Across the benchmark experiments in this repository, Kronos did not consistently beat a simple no-change
-forecast on price error. Its original uncertainty bands were also much narrower than their stated coverage
-suggested.
-
-I also found one daily stock-ranking setup that initially looked quite interesting. Instead of treating that
-result as an edge, I wrote down a confirmation test in advance and repeated it on a much larger group of stocks
-that had not been used in the original experiment.
-
-The result did not replicate.
-
-I decided to keep those findings visible rather than design CandleCast around the best-looking examples.
-
-For me, the project is therefore less about asking:
+For me, the project is less about asking:
 
 > **Where will the market go next?**
 
@@ -106,7 +91,7 @@ accounts mostly no longer allow password sign-in for mail apps.
 
 ## What it does
 
-Enter a market symbol, choose a timeframe, and decide how many bars ahead you want the model to forecast.
+Enter a market symbol ticker like AAPL, choose a timeframe, and decide how many bars ahead you want the model to forecast.
 
 CandleCast then uses Kronos to generate a number of possible future price paths and displays their median
 together with an uncertainty range.
@@ -138,7 +123,7 @@ from Alpaca or Yahoo Finance and cached locally.
 Once the app was working, I wanted to know whether the forecasts were actually useful rather than only visually
 convincing.
 
-I therefore kept a separate set of benchmark experiments under [`benchmarks/`](benchmarks/). The current research
+I kept a separate set of benchmark experiments under [`benchmarks/`](benchmarks/). The current research
 record contains roughly 6,800 out-of-sample forecasts across different bar sizes, history lengths and sampling
 settings.
 
@@ -149,8 +134,7 @@ A few findings changed how I looked at the model and, eventually, how I designed
 Across the configurations I tested, Kronos did not beat a simple no-change assumption on price error.
 
 That was important because a forecast chart can still look reasonable even when it is not adding much
-information over a very simple baseline. This is one reason I kept the historical test window inside the app:
-I wanted the forecast to be shown together with something that makes it easier to judge.
+information over a very simple baseline.
 
 ### One promising ranking result did not survive a second test
 
@@ -252,6 +236,17 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 
 A command-line interface (`candlecast run / show / score`) and a nightly batch pipeline are also included
 for research use - see `candlecast --help`.
+
+## A Few Other Market Forecasts
+<img width="1576" height="619" alt="image" src="https://github.com/user-attachments/assets/17ced336-f856-4c97-b93e-efe15e74e19e" />
+
+<img width="1576" height="625" alt="image" src="https://github.com/user-attachments/assets/ff932b1b-c172-40fb-b658-a3285c45de91" />
+
+<img width="1576" height="624" alt="image" src="https://github.com/user-attachments/assets/55de4f0c-6337-4f7f-b0ee-74fd1acb20af" />
+
+<img width="1576" height="632" alt="image" src="https://github.com/user-attachments/assets/25168926-5c09-4514-8d1c-10341701bf8a" />
+
+<img width="1552" height="617" alt="image" src="https://github.com/user-attachments/assets/4c9b9cd7-8ad2-4de9-8db0-7315e12797c8" />
 
 ## Credits and licence
 
